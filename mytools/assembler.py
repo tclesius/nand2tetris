@@ -1,5 +1,6 @@
 import argparse
 import re
+from pathlib import Path
 
 C_COMMAND = 0
 A_COMMAND = 1
@@ -118,7 +119,8 @@ class Parser:
         return self.currentCommand.strip("@").strip("(").strip(")")
 
     def dest(self):
-        return self.currentCommand.split("=")[0]
+        if "=" in self.currentCommand:
+            return self.currentCommand.split("=")[0]
 
     def comp(self):
         if "=" in self.currentCommand:
@@ -180,9 +182,9 @@ if __name__ == "__main__":
 
     # Output file creation
     if args.o:
-        outputFile = open(args.o, 'w')
+        outputFile = open(Path(args.o).with_suffix('.hack'), 'w')
     else:
-        outputFile = open(args.asmFile.split('.')[0] + '.hack', 'w')
+        outputFile = open(Path(args.asmFile).with_suffix('.hack'), 'w')
 
     # First pass
     while parser.hasMoreCommands():
