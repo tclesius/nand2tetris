@@ -206,7 +206,7 @@ if __name__ == "__main__":
         if parser.commandType() == A_COMMAND:
             if not parser.symbol().isnumeric():
                 address = symbolTable.GetAddress(parser.symbol())
-                if address:
+                if address is not None:
                     outputFile.write(f'{address:016b}\n')
                 else:
                     symbolTable.addEntry(parser.symbol(), ramAddress)
