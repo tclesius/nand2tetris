@@ -49,6 +49,13 @@ MEMORY_ACCESS_COMMANDS = {
     "temp": M_TEMP
 }
 
+BASE_ADDRESS = {
+    "argument": "ARG",
+    "local": "LCL",
+    "this": "THIS",
+    "that": "THAT",
+}
+
 
 class Parser:
     def __init__(self, inputFile):
@@ -180,8 +187,71 @@ class CodeWriter:
     def WritePushPop(self, command, segment, index):
         if MEMORY_ACCESS_COMMANDS[segment] == M_CONSTANT:
             if command == C_PUSH:
-                self.outputFile.write(f"@{index}\nD=A\n")
+                constant = index
+                self.outputFile.write(f"@{constant}\n")
+                self.outputFile.write("D=A\n")
                 self.outputFile.write(PUSH)
+
+        if MEMORY_ACCESS_COMMANDS[segment] in [M_LOCAL, M_ARGUMENT, M_THIS, M_THAT]:
+            if command == C_PUSH:
+                self.outputFile.write(f"@{index}\n")
+                self.outputFile.write(f"D=A\n")
+                self.outputFile.write(f"@{BASE_ADDRESS[segment]}\n")
+                self.outputFile.write("A=D+M\n")
+                self.outputFile.write("D=M\n")
+                self.outputFile.write(PUSH)
+
+            if command == C_POP:
+                self.outputFile.write(f"@{index}\n")
+                self.outputFile.write(f"D=A\n")
+                self.outputFile.write(f"@{BASE_ADDRESS[segment]}\n")
+                self.outputFile.write("D=D+M\n")
+                self.outputFile.write("@13\n")  # vm general purpose register saving Base+Index
+                self.outputFile.write("M=D\n")  # vm general purpose register
+                self.outputFile.write(POP)
+                self.outputFile.write("D=M\n")
+                self.outputFile.write("@13\n")  # vm general purpose register
+                self.outputFile.write("A=M\n")  # vm general purpose register
+                self.outputFile.write("M=D\n")
+
+        if MEMORY_ACCESS_COMMANDS[segment] == M_TEMP:
+            # TODO R5 - Rx nutzen
+            if command == C_PUSH:
+                self.outputFile.write(f"@{5 + index}\n")
+                self.outputFile.write(f"D=M\n")
+                self.outputFile.write(PUSH)
+
+            if command == C_POP:
+                self.outputFile.write(POP)
+                self.outputFile.write("D=M\n")
+                self.outputFile.write(f"@{5 + index}\n")
+                self.outputFile.write("M=D\n")
+
+        if MEMORY_ACCESS_COMMANDS[segment] == M_POINTER:
+            # TODO mit TEMP ZUSAMMENFÜHREN
+            if command == C_PUSH:
+                self.outputFile.write(f"@{3 + index}\n")
+                self.outputFile.write(f"D=M\n")
+                self.outputFile.write(PUSH)
+
+            if command == C_POP:
+                self.outputFile.write(POP)
+                self.outputFile.write("D=M\n")
+                self.outputFile.write(f"@{3 + index}\n")
+                self.outputFile.write("M=D\n")
+
+        if MEMORY_ACCESS_COMMANDS[segment] == M_STATIC:
+            # TODO mit TEMP ZUSAMMENFÜHREN
+            if command == C_PUSH:
+                self.outputFile.write(f"@{16 + index}\n")
+                self.outputFile.write(f"D=M\n")
+                self.outputFile.write(PUSH)
+
+            if command == C_POP:
+                self.outputFile.write(POP)
+                self.outputFile.write("D=M\n")
+                self.outputFile.write(f"@{16 + index}\n")
+                self.outputFile.write("M=D\n")
 
     def Close(self):
         ...
