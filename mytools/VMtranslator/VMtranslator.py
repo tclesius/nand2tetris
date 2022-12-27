@@ -42,10 +42,12 @@ class CodeWriter:
 
     def __init__(self, outputFile):
         self.outputFile = open(Path(outputFile).with_suffix('.asm'), 'w')
+        self.fileName = ""
         self.EQ_ID = 0
         self.GT_ID = 0
         self.LT_ID = 0
 
+    # HELPER FUNCTIONS
     def A_COMMAND(self, address):
         self.outputFile.write("@" + str(address) + "\n")
 
@@ -73,8 +75,10 @@ class CodeWriter:
         self.A_COMMAND("SP")
         self.C_COMMAND("M", "M+1")
 
+    # HELPER FUNCTIONS END
+
     def setFileName(self, fileName):
-        ...
+        self.fileName = fileName
 
     def writeInit(self):
         ...
@@ -224,31 +228,42 @@ class CodeWriter:
                 self.C_COMMAND("M", "D")
 
     def Close(self):
-        ...
+        self.outputFile.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='.vm translator')
-    parser.add_argument('vmFile', type=str,
+    parser.add_argument('vmFiles', type=str,
                         help='.vm input file or directory')
     parser.add_argument('--o', type=str,
                         help='output filename')
     args = parser.parse_args()
-    parser = Parser(args.vmFile)
+
+    inputPath = Path(args.vmFiles)
 
     # Output file creation
     if args.o:
         outputFile = Path(args.o).with_suffix('.asm')
+        inputFiles = [inputPath]
     else:
-        outputFile = Path(args.vmFile).with_suffix('.asm')
+        if inputPath.is_dir():
+            dirname = Path(Path(args.vmFiles).parts[-1])
+            outputFile = Path(args.vmFiles).joinpath(dirname.with_suffix('.asm'))  # asm file has name of dir
+            inputFiles = inputPath.glob('*.vm')
+        else:
+            outputFile = Path(args.vmFiles).with_suffix('.asm')
+            inputFiles = [inputPath]
 
     codeWriter = CodeWriter(outputFile)
 
-    while parser.hasMoreCommands():
-        parser.advance()
+    for inputFile in inputFiles:
+        codeWriter.setFileName(inputFile)
+        parser = Parser(inputFile)
 
-        if parser.commandType() in [C_PUSH, C_POP]:
-            codeWriter.WritePushPop(parser.commandType(), parser.arg1(), parser.arg2())
+        while parser.hasMoreCommands():
+            parser.advance()
+            if parser.commandType() in [C_PUSH, C_POP]:
+                codeWriter.WritePushPop(parser.commandType(), parser.arg1(), parser.arg2())
 
-        if parser.commandType() == C_ARITHMETIC:
-            codeWriter.writeArithmetic(parser.arg1())
+            if parser.commandType() == C_ARITHMETIC:
+                codeWriter.writeArithmetic(parser.arg1())
