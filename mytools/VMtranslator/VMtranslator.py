@@ -81,6 +81,7 @@ class CodeWriter:
         self.fileName = fileName
 
     def writeInit(self):
+        # 1
         ...
 
     def writeLabel(self, label):
@@ -96,13 +97,85 @@ class CodeWriter:
         self.C_COMMAND(comp="D", jump="JNE")
 
     def writeCall(self, functionName, numArgs):
+        # 1
         ...
 
     def writeReturn(self):
-        ...
+        # FRAME = LCL
+        self.A_COMMAND("LCL")
+        self.C_COMMAND("D", "M")
+        self.A_COMMAND("R13")
+        self.C_COMMAND("M", "D")
+
+        # RET = *(FRAME-5)
+        self.A_COMMAND(5)
+        self.C_COMMAND("D", "D-A")
+        self.A_COMMAND("R14")
+        self.C_COMMAND("M", "D")
+
+        # *ARG = pop()
+        self.POP("D")
+        self.A_COMMAND("ARG")
+        self.C_COMMAND("A", "M")
+        self.C_COMMAND("M", "D")
+
+        # SP = ARG + 1
+        self.A_COMMAND("ARG")
+        self.C_COMMAND("D", "M")
+        self.A_COMMAND("SP")
+        self.C_COMMAND("M", "D+1")
+
+        # THAT = *(FRAME - 1)
+        self.A_COMMAND("R13")
+        self.C_COMMAND("D", "M")
+
+        self.C_COMMAND("A", "D-1")
+        self.C_COMMAND("D", "M")
+        self.A_COMMAND("THAT")
+        self.C_COMMAND("M", "D")
+
+        # THIS = *(FRAME - 2)
+        self.A_COMMAND("R13")
+        self.C_COMMAND("D", "M")
+
+        self.C_COMMAND("D", "D-1")
+        self.C_COMMAND("A", "D-1")
+        self.C_COMMAND("D", "M")
+        self.A_COMMAND("THIS")
+        self.C_COMMAND("M", "D")
+
+        # ARG = *(FRAME - 3)
+        self.A_COMMAND("R13")
+        self.C_COMMAND("D", "M")
+
+        self.C_COMMAND("D", "D-1")
+        self.C_COMMAND("D", "D-1")
+        self.C_COMMAND("A", "D-1")
+        self.C_COMMAND("D", "M")
+        self.A_COMMAND("ARG")
+        self.C_COMMAND("M", "D")
+
+        # LCL = *(FRAME - 4)
+        self.A_COMMAND("R13")
+        self.C_COMMAND("D", "M")
+
+        self.C_COMMAND("D", "D-1")
+        self.C_COMMAND("D", "D-1")
+        self.C_COMMAND("D", "D-1")
+        self.C_COMMAND("A", "D-1")
+        self.C_COMMAND("D", "M")
+        self.A_COMMAND("LCL")
+        self.C_COMMAND("M", "D")
+
+        self.A_COMMAND("R14")
+        self.C_COMMAND("A", "M")
+        self.C_COMMAND(comp="0", jump="JMP")
 
     def writeFunction(self, functionName, numLocals):
-        ...
+        self.L_COMMAND(functionName)
+        self.C_COMMAND("D", "0")
+        for x in range(numLocals):
+            self.PUSH()
 
     def writeArithmetic(self, command):
         if command == A_ADD:
@@ -279,3 +352,9 @@ if __name__ == "__main__":
 
             if parser.commandType() == C_IF:
                 codeWriter.writeIf(parser.arg1())
+
+            if parser.commandType() == C_FUNCTION:
+                codeWriter.writeFunction(parser.arg1(), parser.arg2())
+
+            if parser.commandType() == C_RETURN:
+                codeWriter.writeReturn()
