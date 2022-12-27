@@ -13,7 +13,7 @@ class Parser:
         self.currentCommand = ""
 
     def hasMoreCommands(self):
-        return self.inputFilePosition < len(self.inputFile) - 1
+        return self.inputFilePosition < len(self.inputFile)
 
     def removeComments(self):
         self.currentCommand = re.sub("(?:/\\*(?:[^*]|(?:\\*+[^*/]))*\\*+/)|(?://.*)", "", self.currentCommand).strip()
@@ -84,13 +84,16 @@ class CodeWriter:
         ...
 
     def writeLabel(self, label):
-        ...
+        self.L_COMMAND("null$" + label)
 
     def writeGoto(self, label):
-        ...
+        self.A_COMMAND("null$" + label)
+        self.C_COMMAND(comp="0", jump="JMP")
 
     def writeIf(self, label):
-        ...
+        self.POP("D")
+        self.A_COMMAND("null$" + label)
+        self.C_COMMAND(comp="D", jump="JNE")
 
     def writeCall(self, functionName, numArgs):
         ...
@@ -267,3 +270,12 @@ if __name__ == "__main__":
 
             if parser.commandType() == C_ARITHMETIC:
                 codeWriter.writeArithmetic(parser.arg1())
+
+            if parser.commandType() == C_LABEL:
+                codeWriter.writeLabel(parser.arg1())
+
+            if parser.commandType() == C_GOTO:
+                codeWriter.writeGoto(parser.arg1())
+
+            if parser.commandType() == C_IF:
+                codeWriter.writeIf(parser.arg1())
