@@ -1,71 +1,7 @@
 import argparse
 import re
 from pathlib import Path
-
-# COMMANDS
-C_ARITHMETIC = 1
-C_PUSH = 2
-C_POP = 3
-C_LABEL = 4
-C_GOTO = 5
-C_IF = 6
-C_FUNCTION = 7
-C_RETURN = 8
-C_CALL = 9
-
-# ROM SEGMENTS
-S_ARGUMENT = 10
-S_LOCAL = 11
-S_STATIC = 12
-S_CONSTANT = 13
-S_THIS = 14
-S_THAT = 15
-S_POINTER = 16
-S_TEMP = 17
-
-# STACK ARITHMETIC
-A_ADD = "add"
-A_SUB = "sub"
-A_NEG = "neg"
-A_EQ = "eq"
-A_GT = "gt"
-A_LT = "lt"
-A_AND = "and"
-A_OR = "or"
-A_NOT = "not"
-
-COMMAND_TYPE = {
-    "add": C_ARITHMETIC,
-    "sub": C_ARITHMETIC,
-    "neg": C_ARITHMETIC,
-    "eq": C_ARITHMETIC,
-    "gt": C_ARITHMETIC,
-    "lt": C_ARITHMETIC,
-    "and": C_ARITHMETIC,
-    "or": C_ARITHMETIC,
-    "not": C_ARITHMETIC,
-
-    "push": C_PUSH,
-    "pop": C_POP,
-}
-
-SEGMENT_TYPE = {
-    "argument": S_ARGUMENT,
-    "local": S_LOCAL,
-    "static": S_STATIC,
-    "constant": S_CONSTANT,
-    "this": S_THIS,
-    "that": S_THAT,
-    "pointer": S_POINTER,
-    "temp": S_TEMP
-}
-
-SEGMENT_POINTER = {
-    "argument": "ARG",
-    "local": "LCL",
-    "this": "THIS",
-    "that": "THAT",
-}
+from Const import *
 
 
 class Parser:
@@ -77,11 +13,14 @@ class Parser:
         self.currentCommand = ""
 
     def hasMoreCommands(self):
-        return self.inputFilePosition < len(self.inputFile)
+        return self.inputFilePosition < len(self.inputFile) - 1
+
+    def removeComments(self):
+        self.currentCommand = re.sub("(?:/\\*(?:[^*]|(?:\\*+[^*/]))*\\*+/)|(?://.*)", "", self.currentCommand).strip()
 
     def advance(self):
-        self.currentCommand = re.sub("(?:/\\*(?:[^*]|(?:\\*+[^*/]))*\\*+/)|(?://.*)", "",
-                                     self.inputFile[self.inputFilePosition]).strip()
+        self.currentCommand = self.inputFile[self.inputFilePosition]
+        self.removeComments()
         self.inputFilePosition += 1
 
     def commandType(self):
@@ -135,6 +74,27 @@ class CodeWriter:
         self.C_COMMAND("M", "M+1")
 
     def setFileName(self, fileName):
+        ...
+
+    def writeInit(self):
+        ...
+
+    def writeLabel(self, label):
+        ...
+
+    def writeGoto(self, label):
+        ...
+
+    def writeIf(self, label):
+        ...
+
+    def writeCall(self, functionName, numArgs):
+        ...
+
+    def writeReturn(self):
+        ...
+
+    def writeFunction(self, functionName, numLocals):
         ...
 
     def writeArithmetic(self, command):
@@ -225,64 +185,43 @@ class CodeWriter:
 
     def WritePushPop(self, command, segment, index):
 
+        if SEGMENT_TYPE[segment] == S_CONSTANT:
+            if command == C_PUSH:
+                self.A_COMMAND(index)
+                self.C_COMMAND("D", "A")
+                self.PUSH()
 
-            if SEGMENT_TYPE[segment] == S_CONSTANT:
-                if command == C_PUSH:
-                    self.A_COMMAND(index)
-                    self.C_COMMAND("D", "A")
-                    self.PUSH()
+        if SEGMENT_TYPE[segment] in [S_LOCAL, S_ARGUMENT, S_THIS, S_THAT]:
+            if command == C_PUSH:
+                self.A_COMMAND(index)
+                self.C_COMMAND("D", "A")
+                self.A_COMMAND(SEGMENT_POINTER[segment])  # pointer to where base address is saved
+                self.C_COMMAND("A", "D+M")
+                self.C_COMMAND("D", "M")
+                self.PUSH()
+            if command == C_POP:
+                self.A_COMMAND(index)
+                self.C_COMMAND("D", "A")
+                self.outputFile.write(f"@{SEGMENT_POINTER[segment]}\n")
+                self.C_COMMAND("D", "D+M")
+                self.A_COMMAND("R13")  # general purpose register
+                self.C_COMMAND("M", "D")
+                self.POP("A")
+                self.C_COMMAND("D", "M")
+                self.A_COMMAND("R13")  # general purpose register
+                self.C_COMMAND("A", "M")
+                self.C_COMMAND("M", "D")
 
-            if SEGMENT_TYPE[segment] in [S_LOCAL, S_ARGUMENT, S_THIS, S_THAT]:
-                if command == C_PUSH:
-                    self.A_COMMAND(index)
-                    self.C_COMMAND("D", "A")
-                    self.A_COMMAND(SEGMENT_POINTER[segment])  # pointer to where base address is saved
-                    self.C_COMMAND("A", "D+M")
-                    self.C_COMMAND("D", "M")
-                    self.PUSH()
-                if command == C_POP:
-                    self.A_COMMAND(index)
-                    self.C_COMMAND("D", "A")
-                    self.outputFile.write(f"@{SEGMENT_POINTER[segment]}\n")
-                    self.C_COMMAND("D", "D+M")
-                    self.A_COMMAND("R13")  # general purpose register
-                    self.C_COMMAND("M", "D")
-                    self.POP("A")
-                    self.C_COMMAND("D", "M")
-                    self.A_COMMAND("R13")  # general purpose register
-                    self.C_COMMAND("A", "M")
-                    self.C_COMMAND("M", "D")
+        if SEGMENT_TYPE[segment] in [S_POINTER, S_TEMP, S_STATIC]:
+            if command == C_PUSH:
+                self.A_COMMAND(SEGMENT_BASE[segment] + index)
+                self.C_COMMAND("D", "M")
+                self.PUSH()
 
-            if SEGMENT_TYPE[segment] == S_POINTER:
-                if command == C_PUSH:
-                    self.A_COMMAND(3 + index)
-                    self.C_COMMAND("D", "M")
-                    self.PUSH()
-
-                if command == C_POP:
-                    self.POP("D")
-                    self.A_COMMAND(3 + index)
-                    self.C_COMMAND("M", "D")
-
-            if SEGMENT_TYPE[segment] == S_TEMP:
-                if command == C_PUSH:
-                    self.A_COMMAND(5 + index)
-                    self.C_COMMAND("D", "M")
-                    self.PUSH()
-                if command == C_POP:
-                    self.POP("D")
-                    self.A_COMMAND(5 + index)
-                    self.C_COMMAND("M", "D")
-
-            if SEGMENT_TYPE[segment] == S_STATIC:
-                if command == C_PUSH:
-                    self.A_COMMAND(16 + index)
-                    self.C_COMMAND("D", "M")
-                    self.PUSH()
-                if command == C_POP:
-                    self.POP("D")
-                    self.A_COMMAND(16 + index)
-                    self.C_COMMAND("M", "D")
+            if command == C_POP:
+                self.POP("D")
+                self.A_COMMAND(SEGMENT_BASE[segment] + index)
+                self.C_COMMAND("M", "D")
 
     def Close(self):
         ...
