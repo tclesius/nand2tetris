@@ -14,7 +14,7 @@ class Parser:
         self.currentCommand = ""
 
     def hasMoreCommands(self):
-        return self.inputFilePosition < len(self.inputFile) - 1
+        return self.inputFilePosition < len(self.inputFile)
 
     def removeComments(self):
         self.currentCommand = re.sub("(?:/\\*(?:[^*]|(?:\\*+[^*/]))*\\*+/)|(?://.*)", "", self.currentCommand).strip()
