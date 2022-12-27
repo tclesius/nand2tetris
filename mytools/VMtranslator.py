@@ -2,7 +2,7 @@ import argparse
 import re
 from pathlib import Path
 
-# Figure 7.5
+# COMMANDS
 C_ARITHMETIC = 1
 C_PUSH = 2
 C_POP = 3
@@ -13,16 +13,28 @@ C_FUNCTION = 7
 C_RETURN = 8
 C_CALL = 9
 
-M_ARGUMENT = 10
-M_LOCAL = 11
-M_STATIC = 12
-M_CONSTANT = 13
-M_THIS = 14
-M_THAT = 15
-M_POINTER = 16
-M_TEMP = 17
+# ROM SEGMENTS
+S_ARGUMENT = 10
+S_LOCAL = 11
+S_STATIC = 12
+S_CONSTANT = 13
+S_THIS = 14
+S_THAT = 15
+S_POINTER = 16
+S_TEMP = 17
 
-COMMANDS = {
+# STACK ARITHMETIC
+A_ADD = "add"
+A_SUB = "sub"
+A_NEG = "neg"
+A_EQ = "eq"
+A_GT = "gt"
+A_LT = "lt"
+A_AND = "and"
+A_OR = "or"
+A_NOT = "not"
+
+COMMAND_TYPE = {
     "add": C_ARITHMETIC,
     "sub": C_ARITHMETIC,
     "neg": C_ARITHMETIC,
@@ -35,21 +47,20 @@ COMMANDS = {
 
     "push": C_PUSH,
     "pop": C_POP,
-    # fehlende hinzufügen...
 }
 
-MEMORY_ACCESS_COMMANDS = {
-    "argument": M_ARGUMENT,
-    "local": M_LOCAL,
-    "static": M_STATIC,
-    "constant": M_CONSTANT,
-    "this": M_THIS,
-    "that": M_THAT,
-    "pointer": M_POINTER,
-    "temp": M_TEMP
+SEGMENT_TYPE = {
+    "argument": S_ARGUMENT,
+    "local": S_LOCAL,
+    "static": S_STATIC,
+    "constant": S_CONSTANT,
+    "this": S_THIS,
+    "that": S_THAT,
+    "pointer": S_POINTER,
+    "temp": S_TEMP
 }
 
-BASE_ADDRESS = {
+SEGMENT_POINTER = {
     "argument": "ARG",
     "local": "LCL",
     "this": "THIS",
@@ -75,7 +86,7 @@ class Parser:
 
     def commandType(self):
         if self.currentCommand:
-            return COMMANDS[self.currentCommand.split()[0]]
+            return COMMAND_TYPE[self.currentCommand.split()[0]]
 
     def arg1(self):
         if self.commandType() == C_ARITHMETIC:
@@ -88,170 +99,190 @@ class Parser:
             return int(self.currentCommand.split()[2])
 
 
-POP = "@SP\nM=M-1\nA=M\n"  # pop value from stack (point to it)
-PUSH = "@SP\nA=M\nM=D\n@SP\nM=M+1\n"  # push value from D register to stack
-
-
 class CodeWriter:
 
     def __init__(self, outputFile):
         self.outputFile = open(Path(outputFile).with_suffix('.asm'), 'w')
-        self.eq_label_id = 0
-        self.gt_label_id = 0
-        self.lt_label_id = 0
+        self.EQ_ID = 0
+        self.GT_ID = 0
+        self.LT_ID = 0
+
+    def A_COMMAND(self, address):
+        self.outputFile.write("@" + str(address) + "\n")
+
+    def C_COMMAND(self, dest=None, comp=None, jump=None):
+        if jump:
+            self.outputFile.write(comp + ";" + jump + "\n")
+        else:
+            self.outputFile.write(dest + "=" + comp + "\n")
+
+    def L_COMMAND(self, xxx):
+        self.outputFile.write("(" + xxx + ")" + "\n")
+
+    def POP(self, dest):
+        # pop value from stack in d or just point to it
+        self.A_COMMAND("SP")
+        self.C_COMMAND("AM", "M-1")
+        if dest == "D":
+            self.C_COMMAND("D", "M")
+
+    def PUSH(self):
+        # push value from d in stack
+        self.A_COMMAND("SP")
+        self.C_COMMAND("A", "M")
+        self.C_COMMAND("M", "D")
+        self.A_COMMAND("SP")
+        self.C_COMMAND("M", "M+1")
 
     def setFileName(self, fileName):
         ...
 
     def writeArithmetic(self, command):
-        if command == "add":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M\n")
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M+D\n")
-            self.outputFile.write(PUSH)
-        if command == "sub":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M\n")
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M-D\n")
-            self.outputFile.write(PUSH)
-        if command == "neg":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=!M\n")
-            self.outputFile.write("D=D+1\n")
-            self.outputFile.write(PUSH)
-        if command == "eq":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M\n")
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M-D\n")
-            self.outputFile.write(f"@EQ{self.eq_label_id}\n")
-            self.outputFile.write("D;JEQ\n")
-            self.outputFile.write("D=0\n")
-            self.outputFile.write(f"@NEQ{self.eq_label_id}\n")
-            self.outputFile.write("0;JMP\n")
-            self.outputFile.write(f"(EQ{self.eq_label_id})\n")
-            self.outputFile.write("D=-1\n")
-            self.outputFile.write(f"(NEQ{self.eq_label_id})\n")
-            self.outputFile.write(PUSH)
-            self.eq_label_id += 1
-        if command == "gt":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M\n")
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M-D\n")
-            self.outputFile.write(f"@GT{self.gt_label_id}\n")
-            self.outputFile.write("D;JGT\n")
-            self.outputFile.write("D=0\n")
-            self.outputFile.write(f"@NGT{self.gt_label_id}\n")
-            self.outputFile.write("0;JMP\n")
-            self.outputFile.write(f"(GT{self.gt_label_id})\n")
-            self.outputFile.write("D=-1\n")
-            self.outputFile.write(f"(NGT{self.gt_label_id})\n")
-            self.outputFile.write(PUSH)
-            self.gt_label_id += 1
-        if command == "lt":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M\n")
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M-D\n")
-            self.outputFile.write(f"@LT{self.lt_label_id}\n")
-            self.outputFile.write("D;JLT\n")
-            self.outputFile.write("D=0\n")
-            self.outputFile.write(f"@NLT{self.lt_label_id}\n")
-            self.outputFile.write("0;JMP\n")
-            self.outputFile.write(f"(LT{self.lt_label_id})\n")
-            self.outputFile.write("D=-1\n")
-            self.outputFile.write(f"(NLT{self.lt_label_id})\n")
-            self.outputFile.write(PUSH)
-            self.lt_label_id += 1
-        if command == "and":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M\n")
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M&D\n")
-            self.outputFile.write(PUSH)
-        if command == "or":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M\n")
-            self.outputFile.write(POP)
-            self.outputFile.write("D=M|D\n")
-            self.outputFile.write(PUSH)
-        if command == "not":
-            self.outputFile.write(POP)
-            self.outputFile.write("D=-M\n")
-            self.outputFile.write("D=D-1\n")
-            self.outputFile.write(PUSH)
+        if command == A_ADD:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "M+D")
+            self.PUSH()
+
+        if command == A_SUB:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "M-D")
+            self.PUSH()
+
+        if command == A_AND:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "M&D")
+            self.PUSH()
+
+        if command == A_OR:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "M|D")
+            self.PUSH()
+
+        if command == A_NOT:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "-M")
+            self.C_COMMAND("D", "D-1")
+            self.PUSH()
+
+        if command == A_NEG:
+            self.POP("A")
+            self.C_COMMAND("D", "!M")
+            self.C_COMMAND("D", "D+1")
+            self.PUSH()
+
+        if command == A_EQ:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "M-D")
+            self.A_COMMAND(f"EQ{self.EQ_ID}")
+            self.C_COMMAND(comp="D", jump="JEQ")
+            self.C_COMMAND("D", "0")
+            self.A_COMMAND(f"NEQ{self.EQ_ID}")
+            self.C_COMMAND(comp="0", jump="JMP")
+            self.L_COMMAND(f"EQ{self.EQ_ID}")
+            self.C_COMMAND("D", "-1")
+            self.L_COMMAND(f"NEQ{self.EQ_ID}")
+            self.PUSH()
+
+            self.EQ_ID += 1
+
+        if command == A_LT:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "M-D")
+            self.A_COMMAND(f"LT{self.LT_ID}")
+            self.C_COMMAND(comp="D", jump="JLT")
+            self.C_COMMAND("D", "0")
+            self.A_COMMAND(f"NLT{self.LT_ID}")
+            self.C_COMMAND(comp="0", jump="JMP")
+            self.L_COMMAND(f"LT{self.LT_ID}")
+            self.C_COMMAND("D", "-1")
+            self.L_COMMAND(f"NLT{self.LT_ID}")
+            self.PUSH()
+
+            self.LT_ID += 1
+
+        if command == A_GT:
+            self.POP("D")
+            self.POP("A")
+            self.C_COMMAND("D", "M-D")
+            self.A_COMMAND(f"GT{self.GT_ID}")
+            self.C_COMMAND(comp="D", jump="JGT")
+            self.C_COMMAND("D", "0")
+            self.A_COMMAND(f"NGT{self.GT_ID}")
+            self.C_COMMAND(comp="0", jump="JMP")
+            self.L_COMMAND(f"GT{self.GT_ID}")
+            self.C_COMMAND("D", "-1")
+            self.L_COMMAND(f"NGT{self.GT_ID}")
+            self.PUSH()
+
+            self.GT_ID += 1
 
     def WritePushPop(self, command, segment, index):
-        if MEMORY_ACCESS_COMMANDS[segment] == M_CONSTANT:
-            if command == C_PUSH:
-                constant = index
-                self.outputFile.write(f"@{constant}\n")
-                self.outputFile.write("D=A\n")
-                self.outputFile.write(PUSH)
 
-        if MEMORY_ACCESS_COMMANDS[segment] in [M_LOCAL, M_ARGUMENT, M_THIS, M_THAT]:
-            if command == C_PUSH:
-                self.outputFile.write(f"@{index}\n")
-                self.outputFile.write(f"D=A\n")
-                self.outputFile.write(f"@{BASE_ADDRESS[segment]}\n")
-                self.outputFile.write("A=D+M\n")
-                self.outputFile.write("D=M\n")
-                self.outputFile.write(PUSH)
 
-            if command == C_POP:
-                self.outputFile.write(f"@{index}\n")
-                self.outputFile.write(f"D=A\n")
-                self.outputFile.write(f"@{BASE_ADDRESS[segment]}\n")
-                self.outputFile.write("D=D+M\n")
-                self.outputFile.write("@13\n")  # vm general purpose register saving Base+Index
-                self.outputFile.write("M=D\n")  # vm general purpose register
-                self.outputFile.write(POP)
-                self.outputFile.write("D=M\n")
-                self.outputFile.write("@13\n")  # vm general purpose register
-                self.outputFile.write("A=M\n")  # vm general purpose register
-                self.outputFile.write("M=D\n")
+            if SEGMENT_TYPE[segment] == S_CONSTANT:
+                if command == C_PUSH:
+                    self.A_COMMAND(index)
+                    self.C_COMMAND("D", "A")
+                    self.PUSH()
 
-        if MEMORY_ACCESS_COMMANDS[segment] == M_TEMP:
-            # TODO R5 - Rx nutzen
-            if command == C_PUSH:
-                self.outputFile.write(f"@{5 + index}\n")
-                self.outputFile.write(f"D=M\n")
-                self.outputFile.write(PUSH)
+            if SEGMENT_TYPE[segment] in [S_LOCAL, S_ARGUMENT, S_THIS, S_THAT]:
+                if command == C_PUSH:
+                    self.A_COMMAND(index)
+                    self.C_COMMAND("D", "A")
+                    self.A_COMMAND(SEGMENT_POINTER[segment])  # pointer to where base address is saved
+                    self.C_COMMAND("A", "D+M")
+                    self.C_COMMAND("D", "M")
+                    self.PUSH()
+                if command == C_POP:
+                    self.A_COMMAND(index)
+                    self.C_COMMAND("D", "A")
+                    self.outputFile.write(f"@{SEGMENT_POINTER[segment]}\n")
+                    self.C_COMMAND("D", "D+M")
+                    self.A_COMMAND("R13")  # general purpose register
+                    self.C_COMMAND("M", "D")
+                    self.POP("A")
+                    self.C_COMMAND("D", "M")
+                    self.A_COMMAND("R13")  # general purpose register
+                    self.C_COMMAND("A", "M")
+                    self.C_COMMAND("M", "D")
 
-            if command == C_POP:
-                self.outputFile.write(POP)
-                self.outputFile.write("D=M\n")
-                self.outputFile.write(f"@{5 + index}\n")
-                self.outputFile.write("M=D\n")
+            if SEGMENT_TYPE[segment] == S_POINTER:
+                if command == C_PUSH:
+                    self.A_COMMAND(3 + index)
+                    self.C_COMMAND("D", "M")
+                    self.PUSH()
 
-        if MEMORY_ACCESS_COMMANDS[segment] == M_POINTER:
-            # TODO mit TEMP ZUSAMMENFÜHREN
-            if command == C_PUSH:
-                self.outputFile.write(f"@{3 + index}\n")
-                self.outputFile.write(f"D=M\n")
-                self.outputFile.write(PUSH)
+                if command == C_POP:
+                    self.POP("D")
+                    self.A_COMMAND(3 + index)
+                    self.C_COMMAND("M", "D")
 
-            if command == C_POP:
-                self.outputFile.write(POP)
-                self.outputFile.write("D=M\n")
-                self.outputFile.write(f"@{3 + index}\n")
-                self.outputFile.write("M=D\n")
+            if SEGMENT_TYPE[segment] == S_TEMP:
+                if command == C_PUSH:
+                    self.A_COMMAND(5 + index)
+                    self.C_COMMAND("D", "M")
+                    self.PUSH()
+                if command == C_POP:
+                    self.POP("D")
+                    self.A_COMMAND(5 + index)
+                    self.C_COMMAND("M", "D")
 
-        if MEMORY_ACCESS_COMMANDS[segment] == M_STATIC:
-            # TODO mit TEMP ZUSAMMENFÜHREN
-            if command == C_PUSH:
-                self.outputFile.write(f"@{16 + index}\n")
-                self.outputFile.write(f"D=M\n")
-                self.outputFile.write(PUSH)
-
-            if command == C_POP:
-                self.outputFile.write(POP)
-                self.outputFile.write("D=M\n")
-                self.outputFile.write(f"@{16 + index}\n")
-                self.outputFile.write("M=D\n")
+            if SEGMENT_TYPE[segment] == S_STATIC:
+                if command == C_PUSH:
+                    self.A_COMMAND(16 + index)
+                    self.C_COMMAND("D", "M")
+                    self.PUSH()
+                if command == C_POP:
+                    self.POP("D")
+                    self.A_COMMAND(16 + index)
+                    self.C_COMMAND("M", "D")
 
     def Close(self):
         ...
@@ -276,10 +307,9 @@ if __name__ == "__main__":
 
     while parser.hasMoreCommands():
         parser.advance()
+
         if parser.commandType() in [C_PUSH, C_POP]:
             codeWriter.WritePushPop(parser.commandType(), parser.arg1(), parser.arg2())
+
         if parser.commandType() == C_ARITHMETIC:
             codeWriter.writeArithmetic(parser.arg1())
-
-        # print(parser.arg1(), parser.arg2())
-        # print(parser.currentCommand)
