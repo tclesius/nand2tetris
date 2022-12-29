@@ -30,7 +30,6 @@ A_AND = "and"
 A_OR = "or"
 A_NOT = "not"
 
-
 COMMAND_TYPE = {
     #  Arithmetic and Logical Commands
     "add": C_ARITHMETIC,
@@ -78,3 +77,50 @@ SEGMENT_BASE = {
     "temp": 5,
     "static": 16,
 }
+
+
+# Register
+class R:
+    R0 = SP = 0
+    R1 = LCL = 1
+    R2 = ARG = 2
+    R3 = THIS = PTR = 3
+    R4 = THAT = 4
+    R5 = TEMP = 5
+    R6 = 6
+    R7 = 7
+    R8 = 8
+    R9 = 9
+    R10 = 10
+    R11 = 11
+    R12 = 12
+    R13 = FRAME = 13
+    R14 = RET = 14
+    R15 = COPY = 15
+
+
+# Memory Segments
+class S:
+    ARGUMENT = "argument"
+    LOCAL = "local"
+    STATIC = "static"
+    CONSTANT = "constant"
+    THIS = "this"
+    THAT = "that"
+    POINTER = "pointer"
+    TEMP = "temp"
+    REG = "reg"
+
+    @staticmethod
+    def R(segment):
+        table = {
+            S.ARGUMENT: R.ARG,
+            S.LOCAL: R.LCL,
+            S.THIS: R.THIS,
+            S.THAT: R.THAT,
+            S.POINTER: R.PTR,
+            S.TEMP: R.TEMP,
+            S.REG: R.R0
+            # static?
+        }
+        return table[segment]
