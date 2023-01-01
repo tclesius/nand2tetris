@@ -39,5 +39,12 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+        //Instruction Decode
+        
+
+        Register(in=, load=, out=); // D-Register
+
+        Register(in=, load=, out=); // A-Register
+        
+        ALU(x=, y=, zx=, nx=, zy=, ny=, f=, no=, out=, zr=, ng=);
 }
